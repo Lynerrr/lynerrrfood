@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat theme so per-app language switching works on all Android versions; Compose draws the UI. -->
+    <style name="Theme.LynerrrFood" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>

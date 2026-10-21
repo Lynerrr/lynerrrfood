@@ -1,0 +1,284 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "16f9121a382c340cfc907d9b4bdf490c",
+    "entities": [
+      {
+        "tableName": "categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "foods",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, `nameLower` TEXT NOT NULL, `categoryId` INTEGER, `kcal` REAL, `detailsFetchedAt` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameLower",
+            "columnName": "nameLower",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "categoryId",
+            "columnName": "categoryId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "kcal",
+            "columnName": "kcal",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "detailsFetchedAt",
+            "columnName": "detailsFetchedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_foods_nameLower",
+            "unique": false,
+            "columnNames": [
+              "nameLower"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_nameLower` ON `${TABLE_NAME}` (`nameLower`)"
+          },
+          {
+            "name": "index_foods_categoryId",
+            "unique": false,
+            "columnNames": [
+              "categoryId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_categoryId` ON `${TABLE_NAME}` (`categoryId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "food_nutrients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`foodId` INTEGER NOT NULL, `name` TEXT NOT NULL, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, PRIMARY KEY(`foodId`, `name`), FOREIGN KEY(`foodId`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "foodId",
+            "columnName": "foodId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "foodId",
+            "name"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "foodId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "nutrients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `section` TEXT NOT NULL, `position` INTEGER NOT NULL, `unit` TEXT NOT NULL, `normLow` REAL, `normHigh` REAL, `userNorm` REAL, PRIMARY KEY(`name`))",
+        "fields": [
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "section",
+            "columnName": "section",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normLow",
+            "columnName": "normLow",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "normHigh",
+            "columnName": "normHigh",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "userNorm",
+            "columnName": "userNorm",
+            "affinity": "REAL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "name"
+          ]
+        }
+      },
+      {
+        "tableName": "diary",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `epochDay` INTEGER NOT NULL, `meal` INTEGER NOT NULL, `foodId` INTEGER NOT NULL, `grams` REAL NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`foodId`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "epochDay",
+            "columnName": "epochDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "meal",
+            "columnName": "meal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "foodId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_diary_epochDay",
+            "unique": false,
+            "columnNames": [
+              "epochDay"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_diary_epochDay` ON `${TABLE_NAME}` (`epochDay`)"
+          },
+          {
+            "name": "index_diary_foodId",
+            "unique": false,
+            "columnNames": [
+              "foodId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_diary_foodId` ON `${TABLE_NAME}` (`foodId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "foodId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '16f9121a382c340cfc907d9b4bdf490c')"
+    ]
+  }
+}
