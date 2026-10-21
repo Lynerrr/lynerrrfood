@@ -2,9 +2,11 @@ name: Release
 
 # Pushing a tag like v1.2 builds the signed release APK and publishes it as a GitHub release, which installed
 # apps then offer as an update. scripts/publish-release.sh creates and pushes the tag.
+# Running it by hand (Actions → Release → Run workflow) is a dry run: build, sign and check, without publishing.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,6 +25,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Check the tag matches versionName
+        if: github.ref_type == 'tag'
         run: |
           version=$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' app/build.gradle.kts)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -30,32 +33,52 @@ jobs:
             exit 1
           fi
 
-      - name: Install the signing key
-        # Release builds are signed with the debug key (see app/build.gradle.kts) so they update existing installs.
+      - name: Install the signing keys
+        # The release key signs; the old debug key adds the rotation proof (signing/lineage.bin) that lets
+        # phones with debug-signed installs accept it. See scripts/sign-release-apk.sh.
         env:
-          KEYSTORE: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          OLD_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE" ]; then echo "::error::Secret SIGNING_KEYSTORE_BASE64 is missing"; exit 1; fi
+          if [ -z "$OLD_KEYSTORE" ] || [ -z "$RELEASE_KEYSTORE" ] || [ -z "$RELEASE_PASSWORD" ]; then
+            echo "::error::Signing secrets are missing"; exit 1
+          fi
           mkdir -p ~/.android
-          echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          echo "$OLD_KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          echo "$RELEASE_KEYSTORE" | base64 -d > ~/release.jks
+          echo "ORG_GRADLE_PROJECT_lynerrrfoodReleaseKeystore=$HOME/release.jks" >> "$GITHUB_ENV"
+          echo "ORG_GRADLE_PROJECT_lynerrrfoodReleasePassword=$RELEASE_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Build
         run: ./gradlew :app:assembleRelease
 
-      - name: Check the signing certificate
+      - name: Sign
+        run: scripts/sign-release-apk.sh "LynerrrFood-${GITHUB_REF_NAME#v}.apk"
+
+      - name: Check the signing certificates
         # With a missing or different key, phones refuse the update; better to fail here than publish it.
         run: |
+          apk="LynerrrFood-${GITHUB_REF_NAME#v}.apk"
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
-          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee certs.txt
-          grep -q "SHA-256 digest: 8efa918e55899d97a7a47d7d7188e8c4da08b29d2ae38c0d5defc5214bc6e8c2" certs.txt
+          "$apksigner" verify --print-certs "$apk" | tee certs.txt
+          grep -q "SHA-256 digest: 4e1769e77e5a393395d0ef481ae31441a885bf057a3c8ede219a5c7359a5f4a9" certs.txt
+          "$apksigner" lineage --in "$apk" --print-certs | tee lineage.txt
+          grep -q "SHA-256 digest: 8efa918e55899d97a7a47d7d7188e8c4da08b29d2ae38c0d5defc5214bc6e8c2" lineage.txt
+
+      - name: Keep the dry-run APK
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: LynerrrFood-*.apk
 
       - name: Publish the release
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # The checkout is shallow and drops the tag's message, which holds the release notes.
           git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           version="${GITHUB_REF_NAME#v}"
-          apk="LynerrrFood-$version.apk"
-          cp app/build/outputs/apk/release/app-release.apk "$apk"
-          gh release create "$GITHUB_REF_NAME" "$apk" --title "LynerrrFood $version" --notes-from-tag
+          gh release create "$GITHUB_REF_NAME" "LynerrrFood-$version.apk" --title "LynerrrFood $version" --notes-from-tag

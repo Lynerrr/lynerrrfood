@@ -29,14 +29,31 @@ android {
         buildConfigField("String", "UPDATES_API", "\"$updatesApi\"")
     }
 
+    // The app's own key, kept out of the repo: lynerrrfoodReleaseKeystore / lynerrrfoodReleasePassword come from
+    // ~/.gradle/gradle.properties (or ORG_GRADLE_PROJECT_* variables in CI).
+    val releaseKeystore = project.findProperty("lynerrrfoodReleaseKeystore") as String?
+    val releasePassword = project.findProperty("lynerrrfoodReleasePassword") as String?
+    if (releaseKeystore != null && releasePassword != null) {
+        signingConfigs.create("release") {
+            storeFile = file(releaseKeystore)
+            storePassword = releasePassword
+            keyAlias = "lynerrrfood"
+            keyPassword = releasePassword
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the same (debug) key as the builds already installed, so it updates them in place and
-            // keeps the diary. Publishing to a store would need a real release key (and a fresh install).
-            signingConfig = signingConfigs.getByName("debug")
+            // Left unsigned here: scripts/sign-release-apk.sh signs it with the release key plus the rotation proof
+            // from the old debug key (signing/lineage.bin), which Gradle can't do, so earlier installs accept it.
+            signingConfig = null
+        }
+        debug {
+            // Same key as releases, so debug builds install over a release (and the other way round).
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
