@@ -68,7 +68,7 @@ jobs:
 
       - name: Keep the dry-run APK
         if: github.ref_type != 'tag'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apk
           path: LynerrrFood-*.apk
