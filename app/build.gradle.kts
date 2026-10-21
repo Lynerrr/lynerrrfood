@@ -12,8 +12,8 @@ android {
         applicationId = "com.lynerrr.food"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         // Where the app checks for a newer packaged-products database, e.g. a GitHub raw link to
         // products/products.json. Set in gradle.properties or with -PproductsManifestUrl=...; empty hides the button.
