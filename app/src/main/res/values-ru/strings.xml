@@ -328,4 +328,30 @@
     <string name="save_recipe">Сохранить рецепт</string>
     <string name="whole_recipe_chip">Всё блюдо · %1$s г</string>
     <string name="half_recipe_chip">Половина · %1$s г</string>
+    <string name="your_foods">⭐ Ваши продукты</string>
+    <string name="tab_frequent">Часто</string>
+    <string name="tab_recent">Недавние</string>
+    <string name="tab_mine">Мои</string>
+    <string name="your_foods_empty">Здесь появятся продукты, которые вы добавляете, — чтобы добавлять их снова одним нажатием.</string>
+    <string name="your_foods_empty_mine">Здесь появятся ваши продукты и рецепты.</string>
+    <string name="usually_grams">обычно %1$s г</string>
+    <string name="quick_add">Добавить сейчас</string>
+    <string name="quick_added">Добавлено %1$s г · %2$s</string>
+    <string name="undo">Отменить</string>
+    <plurals name="kinds">
+        <item quantity="one">%1$d вид</item>
+        <item quantity="few">%1$d вида</item>
+        <item quantity="many">%1$d видов</item>
+        <item quantity="other">%1$d вида</item>
+    </plurals>
+    <string name="kcal_range_per_100">%1$s–%2$s ккал / 100 г</string>
+    <string name="expand">Показать все</string>
+    <string name="collapse">Скрыть</string>
+    <string name="browse_source_health_diet">🇷🇺 health-diet.ru</string>
+    <string name="browse_source_usda">🇺🇸 USDA (названия на английском)</string>
+    <string name="make_my_version">Сделать свою версию</string>
+    <string name="my_version">моя версия</string>
+    <string name="my_version_title">Своя версия</string>
+    <string name="kcal_suggest">По вашим БЖУ выходит ≈ %1$d ккал</string>
+    <string name="use_value">Взять</string>
 </resources>

@@ -64,16 +64,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalTime
 
 
-class FoodViewModel(private val repo: FoodRepository, private val foodId: Int, private val day: Long) : ViewModel() {
+class FoodViewModel(
+    private val repo: FoodRepository,
+    private val foodId: Int,
+    private val day: Long,
+    initialGrams: Double?,
+) : ViewModel() {
     val food = repo.food(foodId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val ingredients = repo.recipeIngredients(foodId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val grams = MutableStateFlow("100")
-    val meal = MutableStateFlow(
-        LocalTime.now().hour.let { h -> if (h < 11) 0 else if (h < 16) 1 else if (h < 21) 2 else 3 }
-    )
+    val meal = MutableStateFlow(currentMeal())
 
     val values = combine(repo.foodNutrients(foodId), repo.nutrientDefs(), grams, repo.targets(day)) { nutrients, defs, g, targets ->
         val factor = (g.toDoubleOrNull() ?: 0.0) / 100
@@ -88,9 +90,14 @@ class FoodViewModel(private val repo: FoodRepository, private val foodId: Int, p
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<Ratio>() to null)
 
     init {
-        // Packaged products start at their stated serving (a can, three cookies) instead of 100 g.
-        viewModelScope.launch {
-            repo.food(foodId).firstOrNull { it != null }?.servingGrams?.let { grams.value = formatGrams(it) }
+        // Start at the amount the user usually logs (from "your foods"), else at a stated serving (a can, three
+        // cookies, a whole recipe), else at 100 g.
+        if (initialGrams != null) {
+            grams.value = formatGrams(initialGrams)
+        } else {
+            viewModelScope.launch {
+                repo.food(foodId).firstOrNull { it != null }?.servingGrams?.let { grams.value = formatGrams(it) }
+            }
         }
     }
 
@@ -110,13 +117,17 @@ class FoodViewModel(private val repo: FoodRepository, private val foodId: Int, p
 fun FoodScreen(
     foodId: Int,
     day: Long,
+    /** Amount to start with instead of the food's serving, e.g. what the user logged last time. */
+    initialGrams: Double? = null,
     onBack: () -> Unit,
     onAdded: () -> Unit,
     /** [recipe]: edit in the recipe editor rather than the custom-food one. */
     onEdit: (recipe: Boolean) -> Unit,
+    /** Start the user's own version of this database food (their macros, its micronutrients). */
+    onCopy: () -> Unit,
     onBestSources: (nutrient: String) -> Unit,
 ) {
-    val vm = appViewModel { FoodViewModel(it.repository, foodId, day) }
+    val vm = appViewModel { FoodViewModel(it.repository, foodId, day, initialGrams) }
     val food by vm.food.collectAsStateWithLifecycle()
     val values by vm.values.collectAsStateWithLifecycle()
     val groups by vm.groups.collectAsStateWithLifecycle()
@@ -175,6 +186,11 @@ fun FoodScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (!custom && food != null) {
+                            TextButton(onClick = onCopy, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                                Text("✏️ " + stringResource(R.string.make_my_version))
+                            }
+                        }
                     }
                 }
             }

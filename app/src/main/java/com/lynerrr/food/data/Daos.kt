@@ -142,6 +142,17 @@ interface DiaryDao {
     @Insert
     suspend fun insert(entry: DiaryEntryEntity): Long
 
+    /** Foods logged since [sinceDay], with how often (distinct days), when last, and the amount last used. */
+    @Query(
+        """SELECT d.foodId AS id, f.name, f.categoryId, f.emoji, f.brand, f.kcal,
+             COUNT(DISTINCT d.epochDay) AS days, MAX(d.createdAt) AS lastUsed,
+             (SELECT d2.grams FROM diary d2 WHERE d2.foodId = d.foodId ORDER BY d2.createdAt DESC LIMIT 1) AS lastGrams
+           FROM diary d JOIN foods f ON f.id = d.foodId
+           WHERE d.epochDay >= :sinceDay
+           GROUP BY d.foodId"""
+    )
+    fun usedFoods(sinceDay: Long): Flow<List<UsedFood>>
+
     @Query("UPDATE diary SET grams = :grams, meal = :meal WHERE id = :id")
     suspend fun update(id: Long, grams: Double, meal: Int)
 

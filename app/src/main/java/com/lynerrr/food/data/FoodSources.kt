@@ -5,10 +5,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Databases the app's foods come from; see [FoodIds.source]. */
-enum class FoodSource(val key: String) {
+/** Databases the app's foods come from; see [FoodIds.source]. [onByDefault]: until the user switches it. */
+enum class FoodSource(val key: String, val onByDefault: Boolean = true) {
     HEALTH_DIET("health_diet"),
-    USDA("usda"),
+    // English names next to the Russian ones crowd search and categories; it's there for whoever wants it.
+    USDA("usda", onByDefault = false),
     PRODUCTS("products"),
 }
 
@@ -18,7 +19,7 @@ enum class FoodSource(val key: String) {
  */
 class FoodSourceSettings(context: Context) {
     private val prefs = context.getSharedPreferences("sources", Context.MODE_PRIVATE)
-    private val _enabled = MutableStateFlow(FoodSource.entries.filter { prefs.getBoolean(it.key, true) }.toSet())
+    private val _enabled = MutableStateFlow(FoodSource.entries.filter { prefs.getBoolean(it.key, it.onByDefault) }.toSet())
     val enabled: StateFlow<Set<FoodSource>> = _enabled.asStateFlow()
 
     fun setEnabled(source: FoodSource, on: Boolean) {

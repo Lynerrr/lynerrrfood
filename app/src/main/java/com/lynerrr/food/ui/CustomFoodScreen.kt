@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lynerrr.food.data.FoodRepository
+import com.lynerrr.food.data.FoodVariant
 import com.lynerrr.food.data.NutrientCatalog
 import com.lynerrr.food.data.NutrientGroup
 import com.lynerrr.food.data.NutrientInfo
@@ -60,17 +62,44 @@ import com.lynerrr.food.net.HealthDietParser
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-class CustomFoodViewModel(private val repo: FoodRepository, private val foodId: Int?) : ViewModel() {
-    data class Existing(val name: String, val emoji: String?, val per100g: Map<String, Double>)
+/** Edits a custom food ([foodId]), or creates one: blank, or as the user's own version of [copyOf]. */
+class CustomFoodViewModel(private val repo: FoodRepository, private val foodId: Int?, private val copyOf: Int?) : ViewModel() {
+    /** The food being edited or copied: values per 100 g with their units, and each nutrient's group. */
+    data class Existing(
+        val name: String,
+        val emoji: String?,
+        val categoryId: Int?,
+        val servingGrams: Double?,
+        val per100g: Map<String, Double>,
+        val units: Map<String, String>,
+        val groups: Map<String, NutrientGroup>,
+    )
 
     suspend fun load(): Existing? {
-        val id = foodId ?: return null
+        val id = foodId ?: copyOf ?: return null
         val food = repo.foodOnce(id) ?: return null
-        return Existing(food.name, food.emoji, repo.foodNutrientsOnce(id).associate { it.name to it.amount })
+        val nutrients = repo.foodNutrientsOnce(id)
+        val sections = repo.nutrientDefsOnce().associate { it.name to it.section }
+        return Existing(
+            food.name, food.emoji, food.categoryId, food.servingGrams,
+            nutrients.associate { it.name to it.amount },
+            nutrients.associate { it.name to it.unit },
+            nutrients.associate { it.name to NutrientCatalog.info(it.name, sections[it.name].orEmpty()).group },
+        )
     }
 
-    fun save(name: String, emoji: String, per100g: Map<NutrientInfo, Double>, barcode: String?, onSaved: (Int) -> Unit) =
-        viewModelScope.launch { onSaved(repo.saveCustomFood(foodId, name, emoji, per100g, barcode)) }
+    fun save(
+        name: String,
+        emoji: String,
+        per100g: Map<NutrientInfo, Double>,
+        extra: Map<String, Pair<Double, String>>,
+        barcode: String?,
+        category: Int,
+        servingGrams: Double?,
+        onSaved: (Int) -> Unit,
+    ) = viewModelScope.launch {
+        onSaved(repo.saveCustomFood(foodId, name, emoji, per100g, barcode, category, extra, servingGrams))
+    }
 }
 
 private val STICKER_CHOICES = listOf(
@@ -92,8 +121,20 @@ private val OPTIONAL_SECTIONS = listOf(
 )
 
 @Composable
-fun CustomFoodScreen(foodId: Int?, initialName: String, barcode: String?, onBack: () -> Unit, onSaved: (Int) -> Unit) {
-    val vm = appViewModel { CustomFoodViewModel(it.repository, foodId) }
+fun CustomFoodScreen(
+    foodId: Int?,
+    initialName: String,
+    barcode: String?,
+    onBack: () -> Unit,
+    onSaved: (Int) -> Unit,
+    /** A database food to start from: the user's own version of it, saved as a new food. */
+    copyOf: Int? = null,
+) {
+    val vm = appViewModel { CustomFoodViewModel(it.repository, foodId, copyOf) }
+    var existing by remember { mutableStateOf<CustomFoodViewModel.Existing?>(null) }
+    // What the form showed when it opened, to tell which fields the user changed.
+    var initialForm by remember { mutableStateOf(emptyMap<String, Double>()) }
+    val myVersion = stringResource(R.string.my_version)
     var name by remember { mutableStateOf(initialName) }
     var emoji by remember { mutableStateOf("⭐") }
     var basis by remember { mutableStateOf("100") }
@@ -101,12 +142,14 @@ fun CustomFoodScreen(foodId: Int?, initialName: String, barcode: String?, onBack
     var open by remember { mutableStateOf(emptySet<Int>()) }
 
     LaunchedEffect(Unit) {
-        vm.load()?.let { existing ->
-            name = existing.name
-            existing.emoji?.let { emoji = it }
-            existing.per100g.forEach { (k, v) -> values[k] = formatAmount(v).replace(',', '.') }
+        vm.load()?.let { e ->
+            existing = e
+            name = if (copyOf != null) "${e.name} ($myVersion)" else e.name
+            (e.emoji ?: foodSticker(null, e.categoryId)).let { emoji = it }
+            e.per100g.forEach { (k, v) -> values[k] = formatAmount(v).replace(',', '.') }
+            initialForm = values.mapNotNull { (k, v) -> v.toDoubleOrNull()?.let { k to it } }.toMap()
             // Open the optional sections that already have values.
-            open = OPTIONAL_SECTIONS.filter { (_, items) -> items.any { it.siteName in existing.per100g } }.map { it.first }.toSet()
+            open = OPTIONAL_SECTIONS.filter { (_, items) -> items.any { it.siteName in e.per100g } }.map { it.first }.toSet()
         }
     }
 
@@ -119,7 +162,9 @@ fun CustomFoodScreen(foodId: Int?, initialName: String, barcode: String?, onBack
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(if (foodId == null) R.string.new_food else R.string.edit_food)) },
+                title = {
+                    Text(stringResource(if (copyOf != null) R.string.my_version_title else if (foodId == null) R.string.new_food else R.string.edit_food))
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
@@ -195,6 +240,22 @@ fun CustomFoodScreen(foodId: Int?, initialName: String, barcode: String?, onBack
                             NumberInput(values[site].orEmpty(), { values[site] = it }, stringResource(label), stringResource(R.string.unit_g), Modifier.weight(1f))
                         }
                     }
+                    // Changed macros on existing data: offer the calories they add up to.
+                    val kcal = num(HealthDietParser.KCAL)
+                    val macrosChanged = existing != null && MACROS.any { num(it) != initialForm[it] }
+                    if (macrosChanged && kcal != null && estimatedKcal > 0 && kotlin.math.abs(kcal - estimatedKcal) / estimatedKcal > 0.03) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.kcal_suggest, estimatedKcal.roundToInt()),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { values[HealthDietParser.KCAL] = estimatedKcal.roundToInt().toString() }) {
+                                Text(stringResource(R.string.use_value))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -238,12 +299,31 @@ fun CustomFoodScreen(foodId: Int?, initialName: String, barcode: String?, onBack
             Button(
                 onClick = {
                     val factor = 100 / basisG!!
-                    val per100g = NutrientGroup.entries.flatMap { NutrientCatalog.editable(it) }.mapNotNull { info ->
+                    val formInfos = NutrientGroup.entries.flatMap { NutrientCatalog.editable(it) }
+                    val per100g = formInfos.mapNotNull { info ->
                         val amount = num(info.siteName)
                             ?: estimatedKcal.takeIf { info.siteName == HealthDietParser.KCAL }
                         amount?.let { info to it * factor }
                     }.toMap()
-                    vm.save(name.trim(), emoji, per100g, barcode, onSaved)
+                    val e = existing
+                    if (e == null) {
+                        vm.save(name.trim(), emoji, per100g, emptyMap(), barcode, FoodRepository.CUSTOM_CATEGORY, null, onSaved)
+                    } else {
+                        // Keep what the form doesn't show, and let amino/fatty acids follow changed protein/fat.
+                        val formNames = formInfos.map { it.siteName }.toSet()
+                        val merged = FoodVariant.merge(e.per100g, per100g.mapKeys { it.key.siteName }, initialForm, formNames) {
+                            e.groups[it] ?: NutrientCatalog.info(it).group
+                        }
+                        val byInfo = formInfos.mapNotNull { info -> merged[info.siteName]?.let { info to it } }.toMap()
+                        val extra = merged.filterKeys { it !in formNames }
+                            .mapValues { (n, v) -> v to (e.units[n] ?: NutrientCatalog.info(n).unit) }
+                        vm.save(
+                            name.trim(), emoji, byInfo, extra, barcode,
+                            category = e.categoryId ?: FoodRepository.CUSTOM_CATEGORY,
+                            servingGrams = e.servingGrams.takeIf { copyOf != null },
+                            onSaved = onSaved,
+                        )
+                    }
                 },
                 enabled = valid,
                 modifier = Modifier.fillMaxWidth(),

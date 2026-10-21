@@ -193,6 +193,9 @@ fun GramsField(value: String, onValueChange: (String) -> Unit, modifier: Modifie
     )
 }
 
+/** The meal a food eaten now most likely belongs to: breakfast, lunch, dinner or snack, by the clock. */
+fun currentMeal(): Int = java.time.LocalTime.now().hour.let { h -> if (h < 11) 0 else if (h < 16) 1 else if (h < 21) 2 else 3 }
+
 @Composable
 fun MealPicker(selected: Int, onSelect: (Int) -> Unit) {
     Row(

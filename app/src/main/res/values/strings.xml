@@ -329,4 +329,28 @@
     <string name="save_recipe">Save recipe</string>
     <string name="whole_recipe_chip">Whole recipe · %1$s g</string>
     <string name="half_recipe_chip">Half · %1$s g</string>
+    <string name="your_foods">⭐ Your foods</string>
+    <string name="tab_frequent">Frequent</string>
+    <string name="tab_recent">Recent</string>
+    <string name="tab_mine">Mine</string>
+    <string name="your_foods_empty">Foods you log show up here, so you can add them again in one tap.</string>
+    <string name="your_foods_empty_mine">Foods and recipes you create show up here.</string>
+    <string name="usually_grams">usually %1$s g</string>
+    <string name="quick_add">Add now</string>
+    <string name="quick_added">Added %1$s g · %2$s</string>
+    <string name="undo">Undo</string>
+    <plurals name="kinds">
+        <item quantity="one">%1$d kind</item>
+        <item quantity="other">%1$d kinds</item>
+    </plurals>
+    <string name="kcal_range_per_100">%1$s–%2$s kcal / 100 g</string>
+    <string name="expand">Show all</string>
+    <string name="collapse">Hide</string>
+    <string name="browse_source_health_diet">🇷🇺 health-diet.ru</string>
+    <string name="browse_source_usda">🇺🇸 USDA (English names)</string>
+    <string name="make_my_version">Make my version</string>
+    <string name="my_version">my version</string>
+    <string name="my_version_title">My version</string>
+    <string name="kcal_suggest">Your macros add up to ≈ %1$d kcal</string>
+    <string name="use_value">Use</string>
 </resources>

@@ -58,8 +58,9 @@ class FoodRepository(
     suspend fun foodOnce(id: Int) = foods.food(id)
 
     /**
-     * Creates (id == null) or updates a custom food. [per100g] maps site nutrient names to amounts per 100 g.
-     * Returns the food's id.
+     * Creates (id == null) or updates a custom food. [per100g] holds the editor's nutrients per 100 g; [extra] the
+     * ones it doesn't show (name to amount and unit), kept from the food it was edited or copied from.
+     * [servingGrams] carries a copied product's serving over. Returns the food's id.
      */
     suspend fun saveCustomFood(
         id: Int?,
@@ -68,19 +69,29 @@ class FoodRepository(
         per100g: Map<NutrientInfo, Double>,
         barcode: String? = null,
         category: Int = CUSTOM_CATEGORY,
+        extra: Map<String, Pair<Double, String>> = emptyMap(),
+        servingGrams: Double? = null,
     ): Int =
         db.withTransaction {
             val foodId = id ?: (minOf(foods.minFoodId(), 0) - 1)
             // Editing keeps the food where it is (an AI estimate stays among AI estimates).
             val categoryId = id?.let { foods.food(it)?.categoryId } ?: category
-            // The names are only fallbacks; the UI shows translated labels for these categories.
-            foods.upsertCategories(listOf(CategoryEntity(categoryId, if (categoryId == AI_CATEGORY) "AI estimates" else "My foods")))
-            foods.upsertFood(foodId, name, categoryId, per100g.entries.firstOrNull { it.key.siteName == HealthDietParser.KCAL }?.value)
+            // The user's own categories; the names are only fallbacks, the UI shows translated labels. A copy of a
+            // database food stays in that food's category, whose name mustn't be overwritten.
+            if (categoryId < 0) {
+                foods.upsertCategories(listOf(CategoryEntity(categoryId, if (categoryId == AI_CATEGORY) "AI estimates" else "My foods")))
+            }
+            val kcal = per100g.entries.firstOrNull { it.key.siteName == HealthDietParser.KCAL }?.value ?: extra[HealthDietParser.KCAL]?.first
+            foods.upsertFood(foodId, name, categoryId, kcal)
+            if (servingGrams != null) foods.setServingGrams(foodId, servingGrams)
             foods.setEmoji(foodId, emoji)
             // A barcode with no online match: the next scan of it finds this food.
             if (barcode != null) foods.setProductInfo(foodId, null, barcode, null)
             foods.deleteNutrients(foodId)
-            foods.insertNutrients(per100g.map { (info, amount) -> FoodNutrientEntity(foodId, info.siteName, amount, info.unit) })
+            foods.insertNutrients(
+                per100g.map { (info, amount) -> FoodNutrientEntity(foodId, info.siteName, amount, info.unit) } +
+                    extra.map { (name, v) -> FoodNutrientEntity(foodId, name, v.first, v.second) },
+            )
             foods.insertNutrientDefs(per100g.keys.map {
                 NutrientEntity(it.siteName, it.group.siteSection, it.order, it.unit, null, null, null)
             })
@@ -112,6 +123,8 @@ class FoodRepository(
             foodId
         }
 
+    suspend fun nutrientDefsOnce() = foods.nutrientDefsOnce()
+
     fun recipeIngredients(recipeId: Int) = foods.recipeIngredients(recipeId)
     suspend fun recipeIngredientsOnce(recipeId: Int) = foods.recipeIngredientsOnce(recipeId)
 
@@ -123,10 +136,12 @@ class FoodRepository(
     fun intake(day: Long) = diary.intakeForDay(day)
     fun contributions(day: Long) = diary.contributionsForDay(day)
 
-    suspend fun addToDiary(day: Long, meal: Int, foodId: Int, grams: Double) {
+    /** Returns the new entry's id. */
+    suspend fun addToDiary(day: Long, meal: Int, foodId: Int, grams: Double): Long =
         diary.insert(DiaryEntryEntity(epochDay = day, meal = meal, foodId = foodId, grams = grams,
             createdAt = System.currentTimeMillis()))
-    }
+
+    fun usedFoods(sinceDay: Long) = diary.usedFoods(sinceDay)
 
     suspend fun updateEntry(id: Long, grams: Double, meal: Int) = diary.update(id, grams, meal)
     suspend fun deleteEntry(id: Long) = diary.delete(id)

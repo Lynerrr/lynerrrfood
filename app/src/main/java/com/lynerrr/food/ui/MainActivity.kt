@@ -37,9 +37,10 @@ class MainActivity : AppCompatActivity() {
                     ) { entry ->
                         val day = entry.arguments!!.getLong("day")
                         SearchScreen(
+                            day = day,
                             initialQuery = entry.arguments!!.getString("q").orEmpty(),
                             onBack = { nav.popBackStack() },
-                            onOpenFood = { id -> nav.navigate("food/$id/$day") },
+                            onOpenFood = { id, grams -> nav.navigate("food/$id/$day" + (grams?.let { "?grams=$it" } ?: "")) },
                             onCreateFood = { name, barcode ->
                                 nav.navigate("custom/0/$day?name=${Uri.encode(name)}&barcode=${Uri.encode(barcode.orEmpty())}")
                             },
@@ -56,27 +57,34 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     composable(
-                        "food/{id}/{day}",
-                        listOf(navArgument("id") { type = NavType.IntType }, dayArg),
+                        "food/{id}/{day}?grams={grams}",
+                        listOf(
+                            navArgument("id") { type = NavType.IntType },
+                            dayArg,
+                            navArgument("grams") { type = NavType.StringType; defaultValue = "" },
+                        ),
                     ) { entry ->
                         val id = entry.arguments!!.getInt("id")
                         val day = entry.arguments!!.getLong("day")
                         FoodScreen(
                             foodId = id,
                             day = day,
+                            initialGrams = entry.arguments!!.getString("grams")?.toDoubleOrNull(),
                             onBack = { nav.popBackStack() },
                             onAdded = { nav.popBackStack("diary", inclusive = false) },
                             onEdit = { recipe -> nav.navigate(if (recipe) "recipe/$id/$day" else "custom/$id/$day") },
+                            onCopy = { nav.navigate("custom/0/$day?copyOf=$id") },
                             onBestSources = { nutrient -> nav.navigate("sources/${Uri.encode(nutrient)}/$day") },
                         )
                     }
                     composable(
-                        "custom/{id}/{day}?name={name}&barcode={barcode}",
+                        "custom/{id}/{day}?name={name}&barcode={barcode}&copyOf={copyOf}",
                         listOf(
                             navArgument("id") { type = NavType.IntType },
                             dayArg,
                             navArgument("name") { type = NavType.StringType; defaultValue = "" },
                             navArgument("barcode") { type = NavType.StringType; defaultValue = "" },
+                            navArgument("copyOf") { type = NavType.StringType; defaultValue = "" },
                         ),
                     ) { entry ->
                         // id 0 = new food; custom foods have negative ids.
@@ -86,13 +94,14 @@ class MainActivity : AppCompatActivity() {
                             foodId = id,
                             initialName = entry.arguments!!.getString("name").orEmpty(),
                             barcode = entry.arguments!!.getString("barcode")?.ifBlank { null },
+                            copyOf = entry.arguments!!.getString("copyOf")?.toIntOrNull(),
                             onBack = { nav.popBackStack() },
                             onSaved = { savedId ->
                                 if (id != null) {
                                     nav.popBackStack()
                                 } else {
                                     nav.navigate("food/$savedId/$day") {
-                                        popUpTo("custom/{id}/{day}?name={name}&barcode={barcode}") { inclusive = true }
+                                        popUpTo("custom/{id}/{day}?name={name}&barcode={barcode}&copyOf={copyOf}") { inclusive = true }
                                     }
                                 }
                             },

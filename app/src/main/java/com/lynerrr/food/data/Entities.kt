@@ -114,6 +114,19 @@ data class DiaryItem(
     val carbs: Double?,
 )
 
+/** A food the user has logged recently: on how many [days], when last, and the amount used then. */
+data class UsedFood(
+    val id: Int,
+    val name: String,
+    val categoryId: Int?,
+    val emoji: String?,
+    val brand: String?,
+    val kcal: Double?,
+    val days: Int,
+    val lastUsed: Long,
+    val lastGrams: Double,
+)
+
 /** Total amount of a nutrient eaten in a day, in [unit]. */
 data class NutrientAmount(
     val name: String,
