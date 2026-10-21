@@ -5,8 +5,12 @@
     <!-- Installing downloaded updates (the user still allows it once in system settings). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- enableOnBackInvokedCallback=false: no predictive back. From Android 16 it's on by default for apps
+         targeting it, and the shrinking-screen preview looked off here; the back gesture now acts like the back
+         button on every phone. Google calls this opt-out temporary, so recheck on new Android versions. -->
     <application
         android:name=".FoodApp"
+        android:enableOnBackInvokedCallback="false"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

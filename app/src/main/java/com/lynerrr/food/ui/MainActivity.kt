@@ -3,14 +3,7 @@ package com.lynerrr.food.ui
 import android.net.Uri
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import androidx.activity.BackEventCompat
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.enableEdgeToEdge
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,22 +22,7 @@ class MainActivity : AppCompatActivity() {
                 UpdateDialogs(updater)
                 val nav = rememberNavController()
                 val dayArg = navArgument("day") { type = NavType.LongType }
-                NavHost(
-                    nav,
-                    startDestination = "diary",
-                    enterTransition = { fadeIn(tween(TRANSITION_MS)) + slideInHorizontally(tween(TRANSITION_MS)) { it / 8 } },
-                    exitTransition = { fadeOut(tween(TRANSITION_MS)) },
-                    popEnterTransition = { fadeIn(tween(TRANSITION_MS)) },
-                    popExitTransition = { fadeOut(tween(TRANSITION_MS)) + slideOutHorizontally(tween(TRANSITION_MS)) { it / 8 } },
-                    // The back gesture (predictive back, on by default from Android 16) previews the exit while the
-                    // finger moves. Navigation's default shrinks the screen without fading it, so on release it
-                    // vanished at once; this one also fades and follows the swipe, so letting go just finishes it.
-                    predictivePopEnterTransition = { fadeIn(tween(TRANSITION_MS)) },
-                    predictivePopExitTransition = { edge ->
-                        fadeOut(tween(TRANSITION_MS)) + scaleOut(tween(TRANSITION_MS), targetScale = 0.9f) +
-                            slideOutHorizontally(tween(TRANSITION_MS)) { if (edge == BackEventCompat.EDGE_RIGHT) -it / 10 else it / 10 }
-                    },
-                ) {
+                NavHost(nav, startDestination = "diary") {
                     composable("diary") {
                         DiaryScreen(
                             onAddFood = { day -> nav.navigate("search/$day") },
@@ -194,6 +172,3 @@ class MainActivity : AppCompatActivity() {
         (application as FoodApp).updater.onPause()
     }
 }
-
-/** Length of screen-change animations. */
-private const val TRANSITION_MS = 250
