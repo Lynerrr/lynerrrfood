@@ -1,5 +1,6 @@
 package com.lynerrr.food.data
 
+import android.app.DownloadManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -7,39 +8,45 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.IntentCompat
 import com.lynerrr.food.BuildConfig
 import com.lynerrr.food.FoodApp
+import com.lynerrr.food.R
 import com.lynerrr.food.net.GitHubReleases
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Self-update from GitHub releases: a quiet check whenever the app comes to the foreground (Android usually keeps it
  * running in the background, so "on start" alone would rarely happen), then, when the user agrees, download the APK
+ * with the system's DownloadManager (it keeps going when the app is left, retries and resumes after network drops)
  * and hand it to the system installer. Updates install only if signed with the same key as the installed app.
  */
 class AppUpdater(private val context: Context, private val repo: String, private val scope: CoroutineScope) {
     sealed interface State {
         data object Idle : State
         data class Available(val release: GitHubReleases.Release) : State
-        data class Downloading(val release: GitHubReleases.Release, val done: Long, val total: Long) : State
+        /** [waiting]: paused by the system, e.g. until the network is back. */
+        data class Downloading(
+            val release: GitHubReleases.Release,
+            val done: Long,
+            val total: Long,
+            val waiting: Boolean = false,
+        ) : State
+        /** Downloaded while the app was in the background; installs when it comes back. */
+        data class Downloaded(val release: GitHubReleases.Release, val apk: File) : State
         /** Downloaded, but the user still has to allow this app to install apps. */
-        data class NeedsPermission(val release: GitHubReleases.Release) : State
+        data class NeedsPermission(val release: GitHubReleases.Release, val apk: File) : State
         data object Installing : State
         data class Failed(val message: String) : State
     }
@@ -63,7 +70,8 @@ class AppUpdater(private val context: Context, private val repo: String, private
     private var lastCheck = 0L
     private var checkJob: Job? = null
     private var job: Job? = null
-    private val apkFile get() = File(context.cacheDir, "updates/update.apk")
+    private var inForeground = false
+    private val downloads = context.getSystemService(DownloadManager::class.java)
 
     /** Looks for a newer release, at most once per [CHECK_INTERVAL_MS]; failures (offline, rate limit) are ignored. */
     private fun checkIfDue() {
@@ -72,7 +80,6 @@ class AppUpdater(private val context: Context, private val repo: String, private
         if (lastCheck != 0L && now - lastCheck < CHECK_INTERVAL_MS) return
         lastCheck = now
         checkJob = scope.launch(Dispatchers.IO) {
-            apkFile.delete() // left over from an earlier update
             val release = try {
                 GitHubReleases.latest(repo, BuildConfig.UPDATES_API)
             } catch (e: Exception) {
@@ -120,22 +127,24 @@ class AppUpdater(private val context: Context, private val repo: String, private
 
     fun dismiss() {
         job?.cancel()
+        forgetDownload()
         _state.value = State.Idle
     }
 
     fun updateNow(release: GitHubReleases.Release) {
-        job = scope.launch(Dispatchers.IO) {
-            try {
-                download(release)
-                if (context.packageManager.canRequestPackageInstalls()) install()
-                else _state.value = State.NeedsPermission(release)
-            } catch (e: CancellationException) {
-                apkFile.delete()
-                throw e
-            } catch (e: Exception) {
-                _state.value = State.Failed(e.message ?: e.javaClass.simpleName)
-            }
-        }
+        forgetDownload() // an earlier, unfinished one
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: return run { _state.value = State.Failed("No storage available for the download") }
+        File(dir, APK_NAME).delete()
+        val request = DownloadManager.Request(Uri.parse(release.apkUrl))
+            .setTitle(context.getString(R.string.update_notification, release.version))
+            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, APK_NAME)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+        val id = downloads.enqueue(request)
+        prefs.edit().putLong(KEY_DOWNLOAD_ID, id).putString(KEY_DOWNLOAD_VERSION, release.version).apply()
+        watch(id, release)
     }
 
     /** The system screen where the user allows this app to install updates. */
@@ -143,49 +152,116 @@ class AppUpdater(private val context: Context, private val repo: String, private
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
 
     /**
-     * The app came to the foreground: continue a pending update if the user just allowed installs, otherwise
-     * check for a new release when one is due.
+     * The app came to the foreground: install an update that finished downloading meanwhile (or that waited for the
+     * user to allow installs), pick up a download still running in the system, otherwise check for a new release
+     * when one is due.
      */
     fun onResume() {
-        if (_state.value !is State.NeedsPermission) return checkIfDue()
-        if (context.packageManager.canRequestPackageInstalls()) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    install()
-                } catch (e: Exception) {
-                    _state.value = State.Failed(e.message ?: e.javaClass.simpleName)
-                }
-            }
+        inForeground = true
+        when (val s = _state.value) {
+            is State.Downloaded -> installOrAsk(s.release, s.apk)
+            is State.NeedsPermission -> if (context.packageManager.canRequestPackageInstalls()) installOrAsk(s.release, s.apk)
+            State.Idle -> if (!reattachDownload()) checkIfDue()
+            else -> Unit
         }
     }
 
-    private suspend fun download(release: GitHubReleases.Release) {
+    /** Android doesn't let apps open the installer from the background, so finished downloads wait for [onResume]. */
+    fun onPause() {
+        inForeground = false
+    }
+
+    /** After the app was closed: follows a download it started earlier, or cleans up one already installed. */
+    private fun reattachDownload(): Boolean {
+        if (job?.isActive == true) return true
+        val id = prefs.getLong(KEY_DOWNLOAD_ID, -1)
+        val version = prefs.getString(KEY_DOWNLOAD_VERSION, null)
+        if (id < 0 || version == null) return false
+        if (!GitHubReleases.isNewer(version, BuildConfig.VERSION_NAME)) {
+            forgetDownload()
+            return false
+        }
+        watch(id, GitHubReleases.Release(version, "", "", 0))
+        return true
+    }
+
+    /** Follows a DownloadManager download until it ends. The download itself runs in the system, app open or not. */
+    private fun watch(id: Long, release: GitHubReleases.Release) {
+        job?.cancel()
         _state.value = State.Downloading(release, 0, release.apkSize)
-        apkFile.parentFile!!.mkdirs()
-        // GitHub redirects asset downloads to its storage host; HttpURLConnection follows https → https.
-        val connection = URL(release.apkUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 20_000
-        connection.readTimeout = 60_000
-        if (connection.responseCode != 200) throw IOException("HTTP ${connection.responseCode} downloading the update")
-        val total = connection.contentLengthLong.takeIf { it > 0 } ?: release.apkSize
-        var done = 0L
-        connection.inputStream.use { input ->
-            apkFile.outputStream().use { output ->
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    output.write(buffer, 0, n)
-                    done += n
-                    _state.value = State.Downloading(release, done, total)
-                    currentCoroutineContext().ensureActive()
+        job = scope.launch(Dispatchers.IO) {
+            while (true) {
+                val row = downloads.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+                    if (!c.moveToFirst()) return@use null
+                    fun long(column: String) = c.getLong(c.getColumnIndexOrThrow(column))
+                    DownloadRow(
+                        status = long(DownloadManager.COLUMN_STATUS).toInt(),
+                        reason = long(DownloadManager.COLUMN_REASON).toInt(),
+                        done = long(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR),
+                        total = long(DownloadManager.COLUMN_TOTAL_SIZE_BYTES),
+                        localUri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI)),
+                    )
                 }
+                when (row?.status) {
+                    null -> { // removed, e.g. cancelled from the notification
+                        forgetDownload()
+                        _state.value = State.Idle
+                        return@launch
+                    }
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        val apk = File(Uri.parse(row.localUri).path!!)
+                        if (inForeground) installOrAsk(release, apk) else _state.value = State.Downloaded(release, apk)
+                        return@launch
+                    }
+                    DownloadManager.STATUS_FAILED -> {
+                        forgetDownload()
+                        _state.value = State.Failed(downloadError(row.reason))
+                        return@launch
+                    }
+                    else -> _state.value = State.Downloading(
+                        release,
+                        row.done,
+                        row.total.takeIf { it > 0 } ?: release.apkSize,
+                        waiting = row.status == DownloadManager.STATUS_PAUSED,
+                    )
+                }
+                delay(POLL_MS)
             }
         }
-        if (total > 0 && done != total) throw IOException("Download incomplete ($done of $total bytes)")
     }
 
-    private fun install() {
+    private class DownloadRow(val status: Int, val reason: Int, val done: Long, val total: Long, val localUri: String?)
+
+    private fun downloadError(reason: Int) = when (reason) {
+        in 400..599 -> "HTTP $reason"
+        DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Not enough storage"
+        DownloadManager.ERROR_CANNOT_RESUME -> "The download couldn't be resumed"
+        else -> "Download error $reason"
+    }
+
+    /** Drops the remembered download; removing it from DownloadManager also deletes its file. */
+    private fun forgetDownload() {
+        val id = prefs.getLong(KEY_DOWNLOAD_ID, -1)
+        if (id >= 0) downloads.remove(id)
+        prefs.edit().remove(KEY_DOWNLOAD_ID).remove(KEY_DOWNLOAD_VERSION).apply()
+    }
+
+    private fun installOrAsk(release: GitHubReleases.Release, apk: File) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            _state.value = State.NeedsPermission(release, apk)
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                install(apk)
+            } catch (e: Exception) {
+                forgetDownload()
+                _state.value = State.Failed(e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    private fun install(apkFile: File) {
         _state.value = State.Installing
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -217,13 +293,17 @@ class AppUpdater(private val context: Context, private val repo: String, private
                     ?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
             PackageInstaller.STATUS_SUCCESS -> {
-                apkFile.delete()
+                forgetDownload()
                 _state.value = State.Idle
             }
-            PackageInstaller.STATUS_FAILURE_ABORTED -> _state.value = State.Idle // cancelled in the system dialog
-            else -> _state.value = State.Failed(
-                intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Install failed",
-            )
+            PackageInstaller.STATUS_FAILURE_ABORTED -> { // cancelled in the system dialog
+                forgetDownload()
+                _state.value = State.Idle
+            }
+            else -> {
+                forgetDownload()
+                _state.value = State.Failed(intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Install failed")
+            }
         }
     }
 
@@ -232,6 +312,10 @@ class AppUpdater(private val context: Context, private val repo: String, private
         const val SNOOZE_MS = 24 * 60 * 60 * 1000L
         const val KEY_SNOOZED_VERSION = "snoozed_version"
         const val KEY_SNOOZED_UNTIL = "snoozed_until"
+        const val KEY_DOWNLOAD_ID = "download_id"
+        const val KEY_DOWNLOAD_VERSION = "download_version"
+        const val APK_NAME = "update.apk"
+        const val POLL_MS = 500L
     }
 }
 

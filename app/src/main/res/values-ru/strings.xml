@@ -306,4 +306,7 @@
     <string name="update_checking">Проверка…</string>
     <string name="update_up_to_date">У вас последняя версия (%1$s)</string>
     <string name="update_check_failed">Не удалось проверить: %1$s</string>
+    <string name="update_notification">LynerrrFood %1$s</string>
+    <string name="update_waiting">Ожидание подключения…</string>
+    <string name="update_background_hint">Можно выйти из приложения — загрузка продолжится в фоне.</string>
 </resources>

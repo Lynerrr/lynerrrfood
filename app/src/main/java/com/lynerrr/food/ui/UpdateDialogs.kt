@@ -29,7 +29,7 @@ fun UpdateDialogs(updater: AppUpdater) {
     val state by updater.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     when (val s = state) {
-        AppUpdater.State.Idle, AppUpdater.State.Installing -> Unit
+        AppUpdater.State.Idle, AppUpdater.State.Installing, is AppUpdater.State.Downloaded -> Unit
         is AppUpdater.State.Available -> AlertDialog(
             onDismissRequest = { updater.later(s.release) },
             title = { Text(stringResource(R.string.update_available_title)) },
@@ -58,7 +58,15 @@ fun UpdateDialogs(updater: AppUpdater) {
                         progress = { if (s.total > 0) s.done.toFloat() / s.total else 0f },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text(stringResource(R.string.update_progress, megabytes(s.done), megabytes(s.total)))
+                    Text(
+                        if (s.waiting) stringResource(R.string.update_waiting)
+                        else stringResource(R.string.update_progress, megabytes(s.done), megabytes(s.total)),
+                    )
+                    Text(
+                        stringResource(R.string.update_background_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             },
             confirmButton = {},

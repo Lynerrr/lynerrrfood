@@ -136,4 +136,9 @@ class MainActivity : AppCompatActivity() {
         // Checks for updates (when due) every time the app comes back, not just on a cold start.
         (application as FoodApp).updater.onResume()
     }
+
+    override fun onPause() {
+        super.onPause()
+        (application as FoodApp).updater.onPause()
+    }
 }

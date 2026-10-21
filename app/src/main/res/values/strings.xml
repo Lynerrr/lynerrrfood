@@ -307,4 +307,7 @@
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You have the latest version (%1$s)</string>
     <string name="update_check_failed">Couldn’t check: %1$s</string>
+    <string name="update_notification">LynerrrFood %1$s</string>
+    <string name="update_waiting">Waiting for a connection…</string>
+    <string name="update_background_hint">You can leave the app; the download continues in the background.</string>
 </resources>
