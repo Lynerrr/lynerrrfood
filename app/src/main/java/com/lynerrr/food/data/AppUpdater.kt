@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.IntentCompat
 import com.lynerrr.food.BuildConfig
@@ -28,8 +29,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Self-update from GitHub releases: a quiet check on start, then (when the user agrees) download the APK and
- * hand it to the system installer. Updates install only if signed with the same key as the installed app.
+ * Self-update from GitHub releases: a quiet check whenever the app comes to the foreground (Android usually keeps it
+ * running in the background, so "on start" alone would rarely happen), then, when the user agrees, download the APK
+ * and hand it to the system installer. Updates install only if signed with the same key as the installed app.
  */
 class AppUpdater(private val context: Context, private val repo: String, private val scope: CoroutineScope) {
     sealed interface State {
@@ -42,26 +44,79 @@ class AppUpdater(private val context: Context, private val repo: String, private
         data class Failed(val message: String) : State
     }
 
+    /** Outcome of a check the user started from Settings (automatic checks stay silent). */
+    sealed interface ManualCheck {
+        data object Checking : ManualCheck
+        data object UpToDate : ManualCheck
+        data class Failed(val message: String) : ManualCheck
+    }
+
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
-    private var checked = false
+    private val _manualCheck = MutableStateFlow<ManualCheck?>(null)
+    val manualCheck: StateFlow<ManualCheck?> = _manualCheck.asStateFlow()
+
+    /** Whether this build knows where to look for updates. */
+    val isConfigured get() = repo.isNotEmpty()
+    private val prefs = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
+    /** When the last check started (elapsed time, so clock changes don't matter); 0 = not yet in this process. */
+    private var lastCheck = 0L
+    private var checkJob: Job? = null
     private var job: Job? = null
     private val apkFile get() = File(context.cacheDir, "updates/update.apk")
 
-    /** Looks for a newer release once per app start; any failure (offline, rate limit) is ignored. */
-    fun checkOnStart() {
-        if (checked || repo.isEmpty()) return
-        checked = true
-        scope.launch(Dispatchers.IO) {
+    /** Looks for a newer release, at most once per [CHECK_INTERVAL_MS]; failures (offline, rate limit) are ignored. */
+    private fun checkIfDue() {
+        if (repo.isEmpty() || _state.value != State.Idle || checkJob?.isActive == true) return
+        val now = SystemClock.elapsedRealtime()
+        if (lastCheck != 0L && now - lastCheck < CHECK_INTERVAL_MS) return
+        lastCheck = now
+        checkJob = scope.launch(Dispatchers.IO) {
             apkFile.delete() // left over from an earlier update
             val release = try {
                 GitHubReleases.latest(repo, BuildConfig.UPDATES_API)
             } catch (e: Exception) {
                 null
             } ?: return@launch
-            if (GitHubReleases.isNewer(release.version, BuildConfig.VERSION_NAME)) _state.value = State.Available(release)
+            if (GitHubReleases.isNewer(release.version, BuildConfig.VERSION_NAME) && !isSnoozed(release.version) &&
+                _state.value == State.Idle
+            ) {
+                _state.value = State.Available(release)
+            }
         }
     }
+
+    /** Checks right away for the Settings button, ignoring the interval and "Later"; reports the outcome. */
+    fun checkNow() {
+        if (repo.isEmpty() || checkJob?.isActive == true || _state.value != State.Idle) return
+        lastCheck = SystemClock.elapsedRealtime()
+        _manualCheck.value = ManualCheck.Checking
+        checkJob = scope.launch(Dispatchers.IO) {
+            _manualCheck.value = try {
+                val release = GitHubReleases.latest(repo, BuildConfig.UPDATES_API)
+                if (release != null && GitHubReleases.isNewer(release.version, BuildConfig.VERSION_NAME)) {
+                    _state.value = State.Available(release)
+                    null
+                } else {
+                    ManualCheck.UpToDate
+                }
+            } catch (e: Exception) {
+                ManualCheck.Failed(e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    /** "Later": hides this version's prompt for [SNOOZE_MS]; a newer release still prompts right away. */
+    fun later(release: GitHubReleases.Release) {
+        prefs.edit()
+            .putString(KEY_SNOOZED_VERSION, release.version)
+            .putLong(KEY_SNOOZED_UNTIL, System.currentTimeMillis() + SNOOZE_MS)
+            .apply()
+        dismiss()
+    }
+
+    private fun isSnoozed(version: String) =
+        prefs.getString(KEY_SNOOZED_VERSION, null) == version && System.currentTimeMillis() < prefs.getLong(KEY_SNOOZED_UNTIL, 0)
 
     fun dismiss() {
         job?.cancel()
@@ -87,9 +142,13 @@ class AppUpdater(private val context: Context, private val repo: String, private
     fun permissionSettingsIntent() =
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
 
-    /** Continues a pending update once the user comes back from allowing installs. */
+    /**
+     * The app came to the foreground: continue a pending update if the user just allowed installs, otherwise
+     * check for a new release when one is due.
+     */
     fun onResume() {
-        if (_state.value is State.NeedsPermission && context.packageManager.canRequestPackageInstalls()) {
+        if (_state.value !is State.NeedsPermission) return checkIfDue()
+        if (context.packageManager.canRequestPackageInstalls()) {
             scope.launch(Dispatchers.IO) {
                 try {
                     install()
@@ -166,6 +225,13 @@ class AppUpdater(private val context: Context, private val repo: String, private
                 intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Install failed",
             )
         }
+    }
+
+    private companion object {
+        const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
+        const val SNOOZE_MS = 24 * 60 * 60 * 1000L
+        const val KEY_SNOOZED_VERSION = "snoozed_version"
+        const val KEY_SNOOZED_UNTIL = "snoozed_until"
     }
 }
 

@@ -48,6 +48,7 @@ class FoodRepository(
     fun nutrientDefs() = foods.nutrientDefs()
     fun foodCount() = foods.foodCount()
     fun detailedCount() = foods.detailedCount()
+    fun usdaCount() = foods.usdaCount()
     fun productCount() = foods.productCount()
 
     fun allFoods() = foods.allFoods()

@@ -46,6 +46,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.lynerrr.food.data.FoodRepository
 import com.lynerrr.food.data.FoodSearch
+import com.lynerrr.food.data.FoodSourceSettings
+import com.lynerrr.food.data.allows
 import com.lynerrr.food.data.SyncManager
 import com.lynerrr.food.data.SyncState
 import com.lynerrr.food.data.formatAmount
@@ -59,11 +61,12 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-class SearchViewModel(repo: FoodRepository, val sync: SyncManager) : ViewModel() {
+class SearchViewModel(repo: FoodRepository, val sync: SyncManager, sources: FoodSourceSettings) : ViewModel() {
     val query = MutableStateFlow("")
     val categoryId = MutableStateFlow<Int?>(null)
 
-    private val index = repo.allFoods().map { FoodSearch(it) }.flowOn(Dispatchers.Default)
+    private val index = combine(repo.allFoods(), sources.enabled) { foods, enabled -> FoodSearch(foods.filter { enabled.allows(it.id) }) }
+        .flowOn(Dispatchers.Default)
 
     val results = combine(index, query.debounce(150), categoryId) { search, q, c -> search.search(q, c) }
         .flowOn(Dispatchers.Default)
@@ -80,7 +83,7 @@ fun SearchScreen(
     onCreateFood: (name: String, barcode: String?) -> Unit,
     onPhotoEstimate: () -> Unit,
 ) {
-    val vm = appViewModel { SearchViewModel(it.repository, it.sync).apply { query.value = initialQuery } }
+    val vm = appViewModel { SearchViewModel(it.repository, it.sync, it.sources).apply { query.value = initialQuery } }
     val barcodeVm = appViewModel { BarcodeViewModel(it.products) }
     val context = LocalContext.current
     BarcodeDialogs(barcodeVm, onCreate = { name, code -> onCreateFood(name, code) })

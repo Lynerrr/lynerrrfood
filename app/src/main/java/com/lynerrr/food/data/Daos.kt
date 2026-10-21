@@ -80,11 +80,15 @@ interface FoodDao {
     )
     fun withNutrient(nutrient: String): Flow<List<RankedFood>>
 
-    @Query("SELECT COUNT(*) FROM foods WHERE id > 0 AND id < 1000000000")
+    /** health-diet.ru foods (ids below FoodIds.USDA_BASE). */
+    @Query("SELECT COUNT(*) FROM foods WHERE id > 0 AND id < 100000000")
     fun foodCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM foods WHERE detailsFetchedAt IS NOT NULL AND id > 0 AND id < 1000000000")
+    @Query("SELECT COUNT(*) FROM foods WHERE detailsFetchedAt IS NOT NULL AND id > 0 AND id < 100000000")
     fun detailedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM foods WHERE id >= 100000000 AND id < 1000000000")
+    fun usdaCount(): Flow<Int>
 
     @Query("UPDATE foods SET detailsFetchedAt = :time WHERE id = :id")
     suspend fun markFetched(id: Int, time: Long)

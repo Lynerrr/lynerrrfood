@@ -6,6 +6,7 @@ import com.lynerrr.food.data.AppUpdater
 import com.lynerrr.food.data.AppDatabase
 import com.lynerrr.food.data.BundledDatabase
 import com.lynerrr.food.data.FoodRepository
+import com.lynerrr.food.data.FoodSourceSettings
 import com.lynerrr.food.data.ProductsDatabase
 import com.lynerrr.food.data.SyncManager
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,8 @@ class FoodApp : Application() {
         private set
     lateinit var updater: AppUpdater
         private set
+    lateinit var sources: FoodSourceSettings
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -31,7 +34,13 @@ class FoodApp : Application() {
         repository = FoodRepository(db, scope)
         products = ProductsDatabase(this, db)
         ai = AiSettings(this)
-        sync = SyncManager(BundledDatabase(this, db), products, scope)
+        sources = FoodSourceSettings(this)
+        sync = SyncManager(
+            BundledDatabase(this, db),
+            BundledDatabase(this, db, asset = "usda.dat", prefsName = "usda_db"),
+            products,
+            scope,
+        )
         sync.importBundledIfNeeded()
         updater = AppUpdater(this, BuildConfig.UPDATES_REPO, scope)
     }

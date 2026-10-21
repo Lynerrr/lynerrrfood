@@ -29,28 +29,36 @@ object SourceRanking {
         24523 to 60.0, 24524 to 50.0, 24525 to 30.0, 24528 to 30.0,
     )
 
-    private val FRESH_HERBS = listOf("петрушк", "укроп", "базилик", "кинз", "мят", "щавел", "лук зелен", "салат")
+    // Name stems in Russian (health-diet.ru) and English (USDA).
+    private val FRESH_HERBS = listOf(
+        "петрушк", "укроп", "базилик", "кинз", "мят", "щавел", "лук зелен", "салат",
+        "parsley", "dill", "basil", "coriander", "cilantro", "mint", "sorrel", "chives",
+    )
     private val COOKED = listOf("отварн", "варен", "каша", "приготовлен", "тушен")
+    /** English words match whole ("uncooked" contains "cooked"). */
+    private val COOKED_WORDS = setOf("cooked", "boiled")
     /** Legumes eaten fresh, like a vegetable, rather than weighed dry. */
-    private val FRESH_LEGUMES = listOf("свеж", "зелен", "зелён", "стручков")
-    private val DRIED = listOf("сушен", "сухой", "сухая", "сухое", "сухие", "порошок", "сублимир")
+    private val FRESH_LEGUMES = listOf("свеж", "зелен", "зелён", "стручков", "green", "immature", "sprouted")
+    private val DRIED = listOf("сушен", "сухой", "сухая", "сухое", "сухие", "порошок", "сублимир", "dried", "dehydrated", "powder")
 
     /** Typical grams eaten at once, from the category with a few name-based corrections. */
     fun servingGrams(categoryId: Int?, name: String): Double {
         val n = name.lowercase()
-        val first = FoodSearch.tokenize(n).firstOrNull().orEmpty()
+        val tokens = FoodSearch.tokenize(n)
+        val first = tokens.firstOrNull().orEmpty()
         return when {
             categoryId == 24514 && DRIED.none { it in n } && FRESH_HERBS.any { it in n } -> 15.0
             categoryId == 24514 -> SERVING_BY_CATEGORY.getValue(24514)
-            categoryId in setOf(24522, 24523) && COOKED.any { it in n } -> 180.0
+            categoryId in setOf(24522, 24523) && (COOKED.any { it in n } || tokens.any { it in COOKED_WORDS }) -> 180.0
             categoryId == 24523 && FRESH_LEGUMES.any { it in n } -> 150.0
-            DRIED.any { it in n } && categoryId != 24517 -> 15.0
-            first == "сыр" || first == "сыры" -> 30.0
-            first == "масло" -> 10.0
-            first in setOf("сливки", "сметана", "майонез", "соус", "кетчуп") -> 30.0
-            first == "сироп" || "сироп" in FoodSearch.tokenize(n) -> 20.0
+            (DRIED.any { it in n } || "dry" in tokens) && categoryId != 24517 -> 15.0
+            first == "cheese" && ("cottage" in tokens || "ricotta" in tokens) -> 150.0
+            first in setOf("сыр", "сыры", "cheese") -> 30.0
+            first in setOf("масло", "butter") -> 10.0
+            first in setOf("сливки", "сметана", "майонез", "соус", "кетчуп", "cream", "sour", "mayonnaise", "sauce", "catsup") -> 30.0
+            first == "сироп" || "сироп" in tokens || "syrup" in tokens || "syrups" in tokens -> 20.0
             first == "творог" -> 150.0
-            first == "сок" || "сок" in FoodSearch.tokenize(n) -> 200.0
+            first == "сок" || "сок" in tokens || "juice" in tokens -> 200.0
             else -> SERVING_BY_CATEGORY[categoryId] ?: 100.0
         }
     }

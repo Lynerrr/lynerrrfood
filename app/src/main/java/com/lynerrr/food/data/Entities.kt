@@ -11,14 +11,27 @@ data class CategoryEntity(
     val name: String,
 )
 
-/** Food id ranges: custom foods are negative, health-diet.ru foods small, packaged products from [PRODUCT_BASE]. */
+/**
+ * Food id ranges: custom foods are negative, health-diet.ru foods small, USDA foods from [USDA_BASE] (plus their
+ * NDB number), packaged products from [PRODUCT_BASE].
+ */
 object FoodIds {
+    const val USDA_BASE = 100_000_000
     const val PRODUCT_BASE = 1_000_000_000
     fun isProduct(id: Int) = id >= PRODUCT_BASE
+    fun isUsda(id: Int) = id in USDA_BASE until PRODUCT_BASE
+
+    /** Where a food's data comes from; null for the user's own foods, which no source setting hides. */
+    fun source(id: Int): FoodSource? = when {
+        id < 0 -> null
+        isProduct(id) -> FoodSource.PRODUCTS
+        isUsda(id) -> FoodSource.USDA
+        else -> FoodSource.HEALTH_DIET
+    }
 }
 
 /**
- * A food from health-diet.ru, a packaged product (Open Food Facts), or one the user created (negative [id]).
+ * A food from health-diet.ru, USDA, a packaged product (Open Food Facts), or one the user created (negative [id]).
  * Nutrients are only present once [detailsFetchedAt] is set.
  */
 @Entity(tableName = "foods", indices = [Index("nameLower"), Index("categoryId"), Index("barcode")])

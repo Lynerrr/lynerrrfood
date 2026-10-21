@@ -133,7 +133,6 @@
     <string name="language_ru">Русский</string>
     <string name="language_note">Названия продуктов остаются на языке оригинала.</string>
     <string name="no_details">Для этого продукта нет данных о составе.</string>
-    <string name="food_database">База продуктов</string>
     <string name="foods_in_catalog">Продуктов в каталоге: %1$d</string>
     <string name="foods_with_details">С полным составом: %1$d</string>
     <string name="database_explainer">Встроена в приложение и работает полностью офлайн (данные о составе изначально с health-diet.ru). Новые данные приходят с обновлениями приложения.</string>
@@ -297,4 +296,14 @@
     <string name="update_permission_title">Разрешите обновления</string>
     <string name="update_permission">Чтобы установить обновление, разрешите LynerrrFood устанавливать приложения: нажмите «Открыть настройки», включите «Разрешить из этого источника» и вернитесь. Обновление продолжится само.</string>
     <string name="update_failed">Не удалось обновить</string>
+    <string name="task_usda_import">Подготовка продуктов USDA</string>
+    <string name="food_sources">Источники продуктов</string>
+    <string name="food_sources_explainer">Отключите источник, чтобы скрыть его продукты из поиска и подсказок. Дневник и ваши продукты не затрагиваются.</string>
+    <string name="usda_count">Продуктов с полным составом: %1$d</string>
+    <string name="usda_explainer">Министерство сельского хозяйства США, SR Legacy (общественное достояние). Названия на английском; встроено и работает офлайн.</string>
+    <string name="app_updates">Обновления приложения</string>
+    <string name="app_version">Версия %1$s</string>
+    <string name="update_checking">Проверка…</string>
+    <string name="update_up_to_date">У вас последняя версия (%1$s)</string>
+    <string name="update_check_failed">Не удалось проверить: %1$s</string>
 </resources>

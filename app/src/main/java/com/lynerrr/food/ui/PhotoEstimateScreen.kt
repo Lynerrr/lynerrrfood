@@ -60,6 +60,7 @@ import com.lynerrr.food.R
 import com.lynerrr.food.data.EstimatedFood
 import com.lynerrr.food.data.FoodEntity
 import com.lynerrr.food.data.FoodIds
+import com.lynerrr.food.data.FoodSource
 import com.lynerrr.food.data.FoodPhotoAnalyzer
 import com.lynerrr.food.data.FoodRepository
 import com.lynerrr.food.data.FoodSearch
@@ -129,9 +130,13 @@ class PhotoEstimateViewModel(private val app: FoodApp, private val day: Long) : 
         status.value = try {
             val jpeg = withContext(Dispatchers.Default) { MealPhoto.toJpeg(bitmap) }
             val result = FoodPhotoAnalyzer(apiKey.value).analyze(jpeg, note.value, russian)
-            // Match against health-diet.ru foods only: they have full vitamin and mineral data.
+            // Match against health-diet.ru foods only (unless turned off): full vitamin and mineral data, and Russian
+            // names like the estimate's search query.
+            val useSite = FoodSource.HEALTH_DIET in app.sources.enabled.value
             val search = withContext(Dispatchers.Default) {
-                FoodSearch(repo.allFoods().first().filter { it.id in 1 until FoodIds.PRODUCT_BASE && it.detailsFetchedAt != null })
+                FoodSearch(repo.allFoods().first().filter {
+                    useSite && FoodIds.source(it.id) == FoodSource.HEALTH_DIET && it.detailsFetchedAt != null
+                })
             }
             items.value = result.items.map { e ->
                 val match = search.search(e.searchQueryRu, null, limit = 1).firstOrNull()

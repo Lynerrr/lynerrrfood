@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,7 +19,6 @@ class MainActivity : AppCompatActivity() {
         val updater = (application as FoodApp).updater
         setContent {
             FoodTheme {
-                LaunchedEffect(Unit) { updater.checkOnStart() }
                 UpdateDialogs(updater)
                 val nav = rememberNavController()
                 val dayArg = navArgument("day") { type = NavType.LongType }
@@ -135,7 +133,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Back from the "install unknown apps" setting: carry on with a pending update.
+        // Checks for updates (when due) every time the app comes back, not just on a cold start.
         (application as FoodApp).updater.onResume()
     }
 }

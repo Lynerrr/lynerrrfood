@@ -31,7 +31,7 @@ fun UpdateDialogs(updater: AppUpdater) {
     when (val s = state) {
         AppUpdater.State.Idle, AppUpdater.State.Installing -> Unit
         is AppUpdater.State.Available -> AlertDialog(
-            onDismissRequest = updater::dismiss,
+            onDismissRequest = { updater.later(s.release) },
             title = { Text(stringResource(R.string.update_available_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -47,7 +47,7 @@ fun UpdateDialogs(updater: AppUpdater) {
                 }
             },
             confirmButton = { TextButton(onClick = { updater.updateNow(s.release) }) { Text(stringResource(R.string.update_now)) } },
-            dismissButton = { TextButton(onClick = updater::dismiss) { Text(stringResource(R.string.later)) } },
+            dismissButton = { TextButton(onClick = { updater.later(s.release) }) { Text(stringResource(R.string.later)) } },
         )
         is AppUpdater.State.Downloading -> AlertDialog(
             onDismissRequest = {},
@@ -62,10 +62,10 @@ fun UpdateDialogs(updater: AppUpdater) {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = updater::dismiss) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = { TextButton(onClick = { updater.later(s.release) }) { Text(stringResource(R.string.cancel)) } },
         )
         is AppUpdater.State.NeedsPermission -> AlertDialog(
-            onDismissRequest = updater::dismiss,
+            onDismissRequest = { updater.later(s.release) },
             title = { Text(stringResource(R.string.update_permission_title)) },
             text = { Text(stringResource(R.string.update_permission)) },
             confirmButton = {
@@ -73,7 +73,7 @@ fun UpdateDialogs(updater: AppUpdater) {
                     Text(stringResource(R.string.open_settings))
                 }
             },
-            dismissButton = { TextButton(onClick = updater::dismiss) { Text(stringResource(R.string.later)) } },
+            dismissButton = { TextButton(onClick = { updater.later(s.release) }) { Text(stringResource(R.string.later)) } },
         )
         is AppUpdater.State.Failed -> AlertDialog(
             onDismissRequest = updater::dismiss,

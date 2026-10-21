@@ -8,14 +8,20 @@ import java.io.FileNotFoundException
 import java.util.zip.GZIPInputStream
 
 /**
- * Imports the food database bundled in assets (built by the :scraper module) into Room.
+ * Imports a food database bundled in assets (built by the :scraper module) into Room: health-diet.ru foods
+ * (fooddb.dat) or USDA foods (usda.dat), both in the same format.
  * Only food data is touched: diary, weights, custom foods and the user's own norms stay as they are.
  */
-class BundledDatabase(private val context: Context, private val db: AppDatabase) {
-    private val prefs = context.getSharedPreferences("bundled_db", Context.MODE_PRIVATE)
+class BundledDatabase(
+    private val context: Context,
+    private val db: AppDatabase,
+    private val asset: String = "fooddb.dat",
+    prefsName: String = "bundled_db",
+) {
+    private val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     private fun open(): BufferedReader? = try {
-        GZIPInputStream(context.assets.open(ASSET)).bufferedReader(Charsets.UTF_8)
+        GZIPInputStream(context.assets.open(asset)).bufferedReader(Charsets.UTF_8)
     } catch (e: FileNotFoundException) {
         null
     }
@@ -86,8 +92,7 @@ class BundledDatabase(private val context: Context, private val db: AppDatabase)
     }
 
     private companion object {
-        // Gzipped TSV. Not named .gz, since the build would decompress and rename it.
-        const val ASSET = "fooddb.dat"
+        // Assets are gzipped TSV, not named .gz, since the build would decompress and rename them.
         const val KEY_VERSION = "version"
         const val BATCH = 250
     }

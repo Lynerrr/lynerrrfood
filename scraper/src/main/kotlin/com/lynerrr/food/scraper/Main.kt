@@ -34,13 +34,56 @@ private const val US = '\u001F'
 private class RateLimited : Exception()
 
 /**
- * Args: none = everything (everyday foods first), "common" = everyday foods only, "build" = only rebuild the asset.
+ * Args: none = everything (everyday foods first), "common" = everyday foods only, "build" = only rebuild the asset,
+ * "saved <dir> [check]" = add food pages saved from a browser (Ctrl+S) in <dir>; "check" only reports.
  */
 fun main(args: Array<String>) = runBlocking {
     outDir.mkdirs()
-    val mode = args.firstOrNull()
-    if (mode != "build") scrape(commonOnly = mode == "common")
+    when (val mode = args.firstOrNull()) {
+        "build" -> Unit
+        "saved" -> if (!importSaved(File(args[1]), dryRun = args.getOrNull(2) == "check")) return@runBlocking
+        else -> scrape(commonOnly = mode == "common")
+    }
     buildAsset()
+}
+
+/**
+ * Reads food pages a person saved from their browser; each page names its food in its canonical link. Prints how many
+ * nutrients each one has next to the median of already scraped foods in its category, to spot incomplete pages.
+ * Returns whether anything was added.
+ */
+private fun importSaved(dir: File, dryRun: Boolean): Boolean {
+    val catalog = catalogFile.readLines().filter { it.isNotBlank() }.associate { line ->
+        val (id, cat, name) = line.split('\t')
+        id.toInt() to (cat.toInt() to name)
+    }
+    val scraped = foodsFile.readLines().filter { it.split('\t').size == 4 }
+    val done = scraped.map { it.substringBefore('\t').toInt() }.toHashSet()
+    // Typical nutrient count per category, from foods scraped earlier.
+    val median = scraped.groupBy({ it.split('\t')[1].toInt() }, { it.substringAfterLast('\t').count { c -> c == RS } + 1 })
+        .mapValues { (_, counts) -> counts.sorted()[counts.size / 2] }
+    val canonical = Regex("""health-diet\.ru/base_of_food/sostav/(\d+)\.php""")
+
+    var added = 0
+    dir.listFiles { f -> f.isFile && f.name.endsWith(".html") }.orEmpty().sortedBy { it.name }.forEach { file ->
+        val doc = org.jsoup.Jsoup.parse(file, "UTF-8", "https://health-diet.ru")
+        val href = doc.selectFirst("link[rel=canonical]")?.attr("href").orEmpty()
+        val id = canonical.find(href)?.groupValues?.get(1)?.toInt() ?: return@forEach // not a food page
+        val (cat, catalogName) = catalog[id] ?: return@forEach println("  #$id not in the catalog, skipped")
+        val food = try {
+            HealthDietParser.parseFood(doc, id)
+        } catch (e: Exception) {
+            return@forEach println("  #$id $catalogName: no nutrient table (${e.message})")
+        }
+        val status = if (id in done) "already have" else if (dryRun) "new" else "added"
+        println("  #$id ${food.name}: ${food.nutrients.size} nutrients (category median ${median[cat] ?: "?"}), $status")
+        if (id in done || dryRun) return@forEach
+        foodsFile.appendText("$id\t$cat\t${food.name}\t${food.nutrients.joinToString(RS.toString()) { encode(it) }}\n")
+        done += id
+        added++
+    }
+    println("${if (dryRun) "Checked" else "Added"} saved pages; $added new foods, ${catalog.size - done.size} still missing")
+    return added > 0
 }
 
 private suspend fun scrape(commonOnly: Boolean) {

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class SyncTask { IMPORT, PRODUCTS_IMPORT, PRODUCTS_UPDATE }
+enum class SyncTask { IMPORT, USDA_IMPORT, PRODUCTS_IMPORT, PRODUCTS_UPDATE }
 
 sealed interface SyncResult {
     data class Imported(val foods: Int) : SyncResult
@@ -30,6 +30,7 @@ data class SyncState(
 /** Runs long imports and downloads in the app scope so they keep going when the user leaves the screen. */
 class SyncManager(
     private val bundled: BundledDatabase,
+    private val usda: BundledDatabase,
     private val products: ProductsDatabase,
     private val scope: CoroutineScope,
 ) {
@@ -40,6 +41,7 @@ class SyncManager(
     /** Loads the databases shipped with the app the first time a new version of them is seen. */
     fun importBundledIfNeeded() = scope.launch {
         if (bundled.needsImport()) start(SyncTask.IMPORT) { bundled.import(::progress) }?.join()
+        if (usda.needsImport()) start(SyncTask.USDA_IMPORT) { usda.import(::progress) }?.join()
         if (products.bundledNeedsImport()) start(SyncTask.PRODUCTS_IMPORT) { products.importBundled(::progress) }?.join()
     }
 

@@ -467,6 +467,7 @@ fun groupNote(group: NutrientGroup, bodyWeight: Double?): String? = when (group)
 @Composable
 fun syncTaskLabel(task: SyncTask?): String = when (task) {
     SyncTask.IMPORT, null -> stringResource(R.string.task_import)
+    SyncTask.USDA_IMPORT -> stringResource(R.string.task_usda_import)
     SyncTask.PRODUCTS_IMPORT -> stringResource(R.string.task_products_import)
     SyncTask.PRODUCTS_UPDATE -> stringResource(R.string.task_products_update)
 }

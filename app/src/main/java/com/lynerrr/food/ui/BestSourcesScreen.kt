@@ -50,6 +50,8 @@ import androidx.lifecycle.viewModelScope
 import com.lynerrr.food.R
 import com.lynerrr.food.data.BestSources
 import com.lynerrr.food.data.FoodRepository
+import com.lynerrr.food.data.FoodSourceSettings
+import com.lynerrr.food.data.allows
 import com.lynerrr.food.data.NutrientCatalog
 import com.lynerrr.food.data.SourceGroup
 import com.lynerrr.food.data.SourceRanking
@@ -64,7 +66,7 @@ import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-class BestSourcesViewModel(repo: FoodRepository, val nutrient: String) : ViewModel() {
+class BestSourcesViewModel(repo: FoodRepository, sources: FoodSourceSettings, val nutrient: String) : ViewModel() {
     val perKcal = MutableStateFlow(false)
     val commonOnly = MutableStateFlow(true)
 
@@ -74,7 +76,11 @@ class BestSourcesViewModel(repo: FoodRepository, val nutrient: String) : ViewMod
         def?.let { (it.userNorm ?: targets[nutrientKey(nutrient)] ?: it.normLow ?: it.normHigh)?.to(it.unit) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val groups = combine(repo.foodsWithNutrient(nutrient), target, perKcal, commonOnly) { foods, t, byKcal, common ->
+    private val allowedFoods = combine(repo.foodsWithNutrient(nutrient), sources.enabled) { foods, enabled ->
+        foods.filter { enabled.allows(it.id) }
+    }
+
+    val groups = combine(allowedFoods, target, perKcal, commonOnly) { foods, t, byKcal, common ->
         SourceGroup.group(SourceRanking.rank(foods, t, byKcal, common))
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
@@ -89,7 +95,7 @@ fun BestSourcesScreen(
     onOpenFood: (Int) -> Unit,
     onSearch: (String) -> Unit,
 ) {
-    val vm = appViewModel { BestSourcesViewModel(it.repository, nutrient) }
+    val vm = appViewModel { BestSourcesViewModel(it.repository, it.sources, nutrient) }
     val perKcal by vm.perKcal.collectAsStateWithLifecycle()
     val commonOnly by vm.commonOnly.collectAsStateWithLifecycle()
     val groups by vm.groups.collectAsStateWithLifecycle()

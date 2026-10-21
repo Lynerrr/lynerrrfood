@@ -40,3 +40,12 @@ tasks.register<JavaExec>("runProducts") {
     mainClass.set("com.lynerrr.food.scraper.products.ProductsMainKt")
     workingDir = rootDir
 }
+
+// USDA FoodData Central SR Legacy (public domain) as a second food source: ./gradlew :scraper:runUsda
+tasks.register<JavaExec>("runUsda") {
+    group = "application"
+    description = "Builds app/src/main/assets/usda.dat from USDA SR Legacy"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.lynerrr.food.scraper.usda.UsdaMainKt")
+    workingDir = rootDir
+}
