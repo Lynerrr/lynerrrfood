@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Check the tag matches versionName
         run: |
@@ -53,6 +53,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The checkout is shallow and drops the tag's message, which holds the release notes.
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           version="${GITHUB_REF_NAME#v}"
           apk="LynerrrFood-$version.apk"
           cp app/build/outputs/apk/release/app-release.apk "$apk"
