@@ -131,6 +131,32 @@ data class Contribution(
     val amount: Double,
 )
 
+/** One ingredient of a recipe (a food the user built from other foods), in grams, in the order added. */
+@Entity(
+    tableName = "recipe_ingredients",
+    primaryKeys = ["recipeId", "position"],
+    indices = [Index("foodId")],
+    foreignKeys = [
+        ForeignKey(FoodEntity::class, ["id"], ["recipeId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(FoodEntity::class, ["id"], ["foodId"], onDelete = ForeignKey.CASCADE),
+    ],
+)
+data class RecipeIngredientEntity(
+    val recipeId: Int,
+    val position: Int,
+    val foodId: Int,
+    val grams: Double,
+)
+
+/** A recipe ingredient joined with its food, for display. */
+data class RecipeIngredient(
+    val foodId: Int,
+    val grams: Double,
+    val name: String,
+    val categoryId: Int?,
+    val emoji: String?,
+)
+
 @Entity(tableName = "weights")
 data class WeightEntity(
     @PrimaryKey val epochDay: Long,

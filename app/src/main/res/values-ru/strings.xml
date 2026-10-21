@@ -10,7 +10,7 @@
     <string name="target_of">из %1$s</string>
     <string name="target_range">из %1$s–%2$s</string>
     <string name="target_max">из макс. %1$s</string>
-    <string name="target_yours"> · ваша</string>
+    <string name="target_yours">" · ваша"</string>
     <string name="on_track">%1$d из %2$d в норме</string>
     <string name="show_less">Свернуть</string>
     <string name="show_more">Показать ещё %1$d</string>
@@ -79,7 +79,7 @@
     <string name="edit_food">Изменить продукт</string>
     <string name="delete_food">Удалить продукт</string>
     <string name="kcal_per_100_long">%1$s ккал на 100 г</string>
-    <string name="your_food"> · ваш продукт</string>
+    <string name="your_food">" · ваш продукт"</string>
     <string name="add_to_day">Добавить: %1$s</string>
     <string name="share_of_targets">Для %1$s г, в доле от дневных норм</string>
     <string name="delete_food_q">Удалить «%1$s»?</string>
@@ -182,7 +182,7 @@
     <string name="gain">Набрать</string>
     <string name="rate_per_week">%1$s кг/нед.</string>
     <string name="rate_kcal">≈ %1$s%2$d ккал/день от расхода</string>
-    <string name="rate_bodyweight"> (%1$s%% веса в неделю)</string>
+    <string name="rate_bodyweight">" (%1$s%% веса в неделю)"</string>
     <string name="macros">БЖУ</string>
     <string name="unit_g_per_kg">г/кг</string>
     <string name="unit_pct_kcal">% ккал</string>
@@ -309,4 +309,23 @@
     <string name="update_notification">LynerrrFood %1$s</string>
     <string name="update_waiting">Ожидание подключения…</string>
     <string name="update_background_hint">Можно выйти из приложения — загрузка продолжится в фоне.</string>
+    <string name="action_recipe">Рецепт</string>
+    <string name="new_recipe">Новый рецепт</string>
+    <string name="edit_recipe">Изменить рецепт</string>
+    <string name="recipe_name">Название рецепта</string>
+    <string name="my_recipes">Мои рецепты</string>
+    <string name="your_recipe">" · ваш рецепт"</string>
+    <string name="ingredients">Ингредиенты</string>
+    <string name="ingredients_empty">Найдите продукты ниже и укажите, сколько граммов каждого идёт в блюдо.</string>
+    <string name="remove_ingredient">Убрать ингредиент</string>
+    <string name="add_ingredient">Добавить ингредиент…</string>
+    <string name="cooked_weight">Вес после приготовления (необязательно)</string>
+    <string name="cooked_weight_hint">Оставьте пустым, чтобы взять сумму ингредиентов (%1$s г). Взвесьте готовое блюдо, если при готовке вес изменился.</string>
+    <string name="whole_recipe">Всё блюдо · %1$s г</string>
+    <string name="per_100g">На 100 г</string>
+    <string name="macro_line">%1$s ккал · Б %2$s · Ж %3$s · У %4$s</string>
+    <string name="recipe_micros_note">Витамины, минералы и всё остальное из ингредиентов тоже учитываются.</string>
+    <string name="save_recipe">Сохранить рецепт</string>
+    <string name="whole_recipe_chip">Всё блюдо · %1$s г</string>
+    <string name="half_recipe_chip">Половина · %1$s г</string>
 </resources>

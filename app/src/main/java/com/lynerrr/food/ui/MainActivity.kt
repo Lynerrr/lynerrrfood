@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
                                 nav.navigate("custom/0/$day?name=${Uri.encode(name)}&barcode=${Uri.encode(barcode.orEmpty())}")
                             },
                             onPhotoEstimate = { nav.navigate("photo/$day") },
+                            onCreateRecipe = { nav.navigate("recipe/0/$day") },
                         )
                     }
                     composable("photo/{day}", listOf(dayArg)) { entry ->
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity() {
                             day = day,
                             onBack = { nav.popBackStack() },
                             onAdded = { nav.popBackStack("diary", inclusive = false) },
-                            onEdit = { nav.navigate("custom/$id/$day") },
+                            onEdit = { recipe -> nav.navigate(if (recipe) "recipe/$id/$day" else "custom/$id/$day") },
                             onBestSources = { nutrient -> nav.navigate("sources/${Uri.encode(nutrient)}/$day") },
                         )
                     }
@@ -93,6 +94,26 @@ class MainActivity : AppCompatActivity() {
                                     nav.navigate("food/$savedId/$day") {
                                         popUpTo("custom/{id}/{day}?name={name}&barcode={barcode}") { inclusive = true }
                                     }
+                                }
+                            },
+                        )
+                    }
+                    composable(
+                        "recipe/{id}/{day}",
+                        listOf(navArgument("id") { type = NavType.IntType }, dayArg),
+                    ) { entry ->
+                        // id 0 = new recipe; recipes are custom foods with negative ids.
+                        val id = entry.arguments!!.getInt("id").takeIf { it != 0 }
+                        val day = entry.arguments!!.getLong("day")
+                        RecipeScreen(
+                            recipeId = id,
+                            onBack = { nav.popBackStack() },
+                            onSaved = { savedId ->
+                                if (id != null) {
+                                    nav.popBackStack()
+                                } else {
+                                    // Straight to the new recipe's page, where it can be added to the diary.
+                                    nav.navigate("food/$savedId/$day") { popUpTo("recipe/{id}/{day}") { inclusive = true } }
                                 }
                             },
                         )

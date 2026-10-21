@@ -82,6 +82,7 @@ fun SearchScreen(
     onOpenFood: (Int) -> Unit,
     onCreateFood: (name: String, barcode: String?) -> Unit,
     onPhotoEstimate: () -> Unit,
+    onCreateRecipe: () -> Unit,
 ) {
     val vm = appViewModel { SearchViewModel(it.repository, it.sync, it.sources).apply { query.value = initialQuery } }
     val barcodeVm = appViewModel { BarcodeViewModel(it.products) }
@@ -144,6 +145,7 @@ fun SearchScreen(
                             },
                             onPhoto = onPhotoEstimate,
                             onCreate = { onCreateFood("", null) },
+                            onRecipe = onCreateRecipe,
                         )
                     }
                     // Two separate sources: packaged products (Open Food Facts) and foods by type (health-diet.ru).
@@ -170,6 +172,9 @@ fun SearchScreen(
                     if (categoryId == FoodRepository.CUSTOM_CATEGORY && query.isBlank()) {
                         item { CreateFoodItem(stringResource(R.string.create_food)) { onCreateFood("", null) } }
                     }
+                    if (categoryId == FoodRepository.RECIPE_CATEGORY && query.isBlank()) {
+                        item { CreateFoodItem(stringResource(R.string.new_recipe)) { onCreateRecipe() } }
+                    }
                     items(results, key = { "food:${it.id}" }) { food ->
                         ListItem(
                             leadingContent = { FoodAvatar(food.emoji, food.categoryId) },
@@ -190,9 +195,9 @@ fun SearchScreen(
     }
 }
 
-/** Barcode, AI photo and create-your-own, as three tiles above the categories. */
+/** Barcode, AI photo, create-your-own and recipe, as four tiles above the categories. */
 @Composable
-private fun QuickActions(onScan: () -> Unit, onPhoto: () -> Unit, onCreate: () -> Unit) {
+private fun QuickActions(onScan: () -> Unit, onPhoto: () -> Unit, onCreate: () -> Unit, onRecipe: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -201,6 +206,7 @@ private fun QuickActions(onScan: () -> Unit, onPhoto: () -> Unit, onCreate: () -
             Triple("📷", R.string.action_scan, onScan),
             Triple("✨", R.string.action_photo, onPhoto),
             Triple("➕", R.string.action_create, onCreate),
+            Triple("🍲", R.string.action_recipe, onRecipe),
         ).forEach { (sticker, label, action) ->
             Column(
                 Modifier
@@ -246,5 +252,6 @@ private fun ImportProgressCard(state: SyncState) {
 private fun categoryName(category: CategoryEntity): String {
     ProductCategory.of(category.id)?.let { return stringResource(it.title) }
     if (category.id == FoodRepository.AI_CATEGORY) return stringResource(R.string.ai_estimates)
+    if (category.id == FoodRepository.RECIPE_CATEGORY) return stringResource(R.string.my_recipes)
     return if (category.id == FoodRepository.CUSTOM_CATEGORY) stringResource(R.string.my_foods) else category.name
 }

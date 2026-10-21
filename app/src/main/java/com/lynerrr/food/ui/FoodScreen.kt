@@ -2,6 +2,8 @@
 
 package com.lynerrr.food.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -67,6 +69,7 @@ import java.time.LocalTime
 
 class FoodViewModel(private val repo: FoodRepository, private val foodId: Int, private val day: Long) : ViewModel() {
     val food = repo.food(foodId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val ingredients = repo.recipeIngredients(foodId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val grams = MutableStateFlow("100")
     val meal = MutableStateFlow(
         LocalTime.now().hour.let { h -> if (h < 11) 0 else if (h < 16) 1 else if (h < 21) 2 else 3 }
@@ -109,7 +112,8 @@ fun FoodScreen(
     day: Long,
     onBack: () -> Unit,
     onAdded: () -> Unit,
-    onEdit: () -> Unit,
+    /** [recipe]: edit in the recipe editor rather than the custom-food one. */
+    onEdit: (recipe: Boolean) -> Unit,
     onBestSources: (nutrient: String) -> Unit,
 ) {
     val vm = appViewModel { FoodViewModel(it.repository, foodId, day) }
@@ -123,6 +127,8 @@ fun FoodScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val hasDetails = food?.detailsFetchedAt != null
     val custom = foodId < 0
+    val recipe = food?.categoryId == FoodRepository.RECIPE_CATEGORY
+    val ingredients by vm.ingredients.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -133,7 +139,7 @@ fun FoodScreen(
                 },
                 actions = {
                     if (custom) {
-                        IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, stringResource(R.string.edit_food)) }
+                        IconButton(onClick = { onEdit(recipe) }) { Icon(Icons.Default.Edit, stringResource(R.string.edit_food)) }
                         IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, stringResource(R.string.delete_food)) }
                     }
                 },
@@ -165,10 +171,31 @@ fun FoodScreen(
                         }
                         Text(
                             (food?.kcal?.let { stringResource(R.string.kcal_per_100_long, formatAmount(it)) } ?: "") +
-                                if (custom) stringResource(R.string.your_food) else "",
+                                if (recipe) stringResource(R.string.your_recipe) else if (custom) stringResource(R.string.your_food) else "",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+            }
+            if (ingredients.isNotEmpty()) {
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(R.string.ingredients), style = MaterialTheme.typography.titleMedium)
+                            ingredients.forEach { ing ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    FoodAvatar(ing.emoji, ing.categoryId, size = 32.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(ing.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        stringResource(R.string.grams_value, formatGrams(ing.grams)),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -186,12 +213,24 @@ fun FoodScreen(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GramsField(grams, { vm.grams.value = it }, Modifier.fillMaxWidth())
                         food?.servingGrams?.let { serving ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 FilterChip(
                                     selected = grams == formatGrams(serving),
                                     onClick = { vm.grams.value = formatGrams(serving) },
-                                    label = { Text(stringResource(R.string.serving_chip, formatGrams(serving))) },
+                                    label = {
+                                        Text(stringResource(if (recipe) R.string.whole_recipe_chip else R.string.serving_chip, formatGrams(serving)))
+                                    },
                                 )
+                                if (recipe) {
+                                    FilterChip(
+                                        selected = grams == formatGrams(serving / 2),
+                                        onClick = { vm.grams.value = formatGrams(serving / 2) },
+                                        label = { Text(stringResource(R.string.half_recipe_chip, formatGrams(serving / 2))) },
+                                    )
+                                }
                                 FilterChip(
                                     selected = grams == "100",
                                     onClick = { vm.grams.value = "100" },

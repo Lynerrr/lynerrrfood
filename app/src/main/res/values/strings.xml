@@ -11,7 +11,7 @@
     <string name="target_of">of %1$s</string>
     <string name="target_range">of %1$s–%2$s</string>
     <string name="target_max">of max %1$s</string>
-    <string name="target_yours"> · yours</string>
+    <string name="target_yours">" · yours"</string>
     <string name="on_track">%1$d of %2$d on track</string>
     <string name="show_less">Show less</string>
     <string name="show_more">Show %1$d more</string>
@@ -80,7 +80,7 @@
     <string name="edit_food">Edit food</string>
     <string name="delete_food">Delete food</string>
     <string name="kcal_per_100_long">%1$s kcal per 100 g</string>
-    <string name="your_food"> · your food</string>
+    <string name="your_food">" · your food"</string>
     <string name="add_to_day">Add to %1$s</string>
     <string name="share_of_targets">For %1$s g, as a share of your daily targets</string>
     <string name="delete_food_q">Delete %1$s?</string>
@@ -183,7 +183,7 @@
     <string name="gain">Gain</string>
     <string name="rate_per_week">%1$s kg/week</string>
     <string name="rate_kcal">≈ %1$s%2$d kcal/day vs. expenditure</string>
-    <string name="rate_bodyweight"> (%1$s%% of body weight per week)</string>
+    <string name="rate_bodyweight">" (%1$s%% of body weight per week)"</string>
     <string name="macros">Macros</string>
     <string name="unit_g_per_kg">g/kg</string>
     <string name="unit_pct_kcal">% kcal</string>
@@ -310,4 +310,23 @@
     <string name="update_notification">LynerrrFood %1$s</string>
     <string name="update_waiting">Waiting for a connection…</string>
     <string name="update_background_hint">You can leave the app; the download continues in the background.</string>
+    <string name="action_recipe">Recipe</string>
+    <string name="new_recipe">New recipe</string>
+    <string name="edit_recipe">Edit recipe</string>
+    <string name="recipe_name">Recipe name</string>
+    <string name="my_recipes">My recipes</string>
+    <string name="your_recipe">" · your recipe"</string>
+    <string name="ingredients">Ingredients</string>
+    <string name="ingredients_empty">Search below to add foods, then set how many grams of each go in.</string>
+    <string name="remove_ingredient">Remove ingredient</string>
+    <string name="add_ingredient">Add an ingredient…</string>
+    <string name="cooked_weight">Weight after cooking (optional)</string>
+    <string name="cooked_weight_hint">Leave empty to use the ingredients\' total (%1$s g). Weigh the finished dish if cooking changed it.</string>
+    <string name="whole_recipe">Whole recipe · %1$s g</string>
+    <string name="per_100g">Per 100 g</string>
+    <string name="macro_line">%1$s kcal · P %2$s · F %3$s · C %4$s</string>
+    <string name="recipe_micros_note">Vitamins, minerals and everything else the ingredients have are counted too.</string>
+    <string name="save_recipe">Save recipe</string>
+    <string name="whole_recipe_chip">Whole recipe · %1$s g</string>
+    <string name="half_recipe_chip">Half · %1$s g</string>
 </resources>

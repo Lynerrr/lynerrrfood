@@ -60,6 +60,28 @@ interface FoodDao {
     @Query("SELECT COUNT(*) FROM foods WHERE id >= 1000000000")
     fun productCount(): Flow<Int>
 
+    @Query("UPDATE foods SET servingGrams = :servingGrams WHERE id = :id")
+    suspend fun setServingGrams(id: Int, servingGrams: Double?)
+
+    @Query("SELECT * FROM nutrients")
+    suspend fun nutrientDefsOnce(): List<NutrientEntity>
+
+    @Query(
+        """SELECT r.foodId, r.grams, f.name, f.categoryId, f.emoji
+           FROM recipe_ingredients r JOIN foods f ON f.id = r.foodId
+           WHERE r.recipeId = :recipeId ORDER BY r.position"""
+    )
+    fun recipeIngredients(recipeId: Int): Flow<List<RecipeIngredient>>
+
+    @Query("SELECT * FROM recipe_ingredients WHERE recipeId = :recipeId ORDER BY position")
+    suspend fun recipeIngredientsOnce(recipeId: Int): List<RecipeIngredientEntity>
+
+    @Query("DELETE FROM recipe_ingredients WHERE recipeId = :recipeId")
+    suspend fun deleteRecipeIngredients(recipeId: Int)
+
+    @Insert
+    suspend fun insertRecipeIngredients(ingredients: List<RecipeIngredientEntity>)
+
     @Query("UPDATE foods SET emoji = :emoji WHERE id = :id")
     suspend fun setEmoji(id: Int, emoji: String?)
 

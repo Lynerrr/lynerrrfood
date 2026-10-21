@@ -88,6 +88,33 @@ class FoodRepository(
             foodId
         }
 
+    /**
+     * Creates ([id] null) or updates a recipe: a food of its own whose nutrients per 100 g come from [ingredients]
+     * (food id to grams). [cookedGrams] is the finished dish's weight when cooking changed it; otherwise the
+     * ingredients' total. The whole dish is its serving size. Returns the recipe's food id.
+     */
+    suspend fun saveRecipe(id: Int?, name: String, emoji: String, ingredients: List<Pair<Int, Double>>, cookedGrams: Double?): Int =
+        db.withTransaction {
+            val weight = cookedGrams ?: ingredients.sumOf { it.second }
+            val units = foods.nutrientDefsOnce().associate { it.name to it.unit }
+            val values = Recipes.per100g(ingredients.map { (food, grams) -> Recipes.Part(foods.nutrients(food), grams) }, weight, units)
+            val foodId = id ?: (minOf(foods.minFoodId(), 0) - 1)
+            // The name is only a fallback; the UI shows a translated label for this category.
+            foods.upsertCategories(listOf(CategoryEntity(RECIPE_CATEGORY, "My recipes")))
+            foods.upsertFood(foodId, name, RECIPE_CATEGORY, values[HealthDietParser.KCAL]?.first)
+            foods.setEmoji(foodId, emoji)
+            foods.setServingGrams(foodId, weight)
+            foods.deleteNutrients(foodId)
+            foods.insertNutrients(values.map { (n, v) -> FoodNutrientEntity(foodId, n, v.first, v.second) })
+            foods.deleteRecipeIngredients(foodId)
+            foods.insertRecipeIngredients(ingredients.mapIndexed { i, (food, grams) -> RecipeIngredientEntity(foodId, i, food, grams) })
+            foods.markFetched(foodId, System.currentTimeMillis())
+            foodId
+        }
+
+    fun recipeIngredients(recipeId: Int) = foods.recipeIngredients(recipeId)
+    suspend fun recipeIngredientsOnce(recipeId: Int) = foods.recipeIngredientsOnce(recipeId)
+
     suspend fun deleteFood(id: Int) = foods.deleteFood(id)
 
     suspend fun setUserNorm(name: String, value: Double?) = foods.setUserNorm(name, value)
@@ -108,5 +135,7 @@ class FoodRepository(
         const val CUSTOM_CATEGORY = -1
         /** Foods logged from AI photo estimates (custom foods, kept apart from the user's own). */
         const val AI_CATEGORY = -2
+        /** Recipes: custom foods made from other foods. */
+        const val RECIPE_CATEGORY = -3
     }
 }
